@@ -1,0 +1,25 @@
+# Mini-C4 分布式数据流水线依赖包
+
+# 核心依赖
+warcio>=1.7.5              # WARC 文件解析
+trafilatura>=1.6.0        # 文本提取和清理
+
+# 分布式计算
+ray>=2.5.0                # 分布式计算框架
+
+# 去重算法
+datasketch>=1.6.0         # MinHash 和 LSH 实现
+
+# 语言模型
+fasttext>=0.9.2           # FastText 语言识别
+kenlm>=0.0.0              # KenLM 困惑度计算
+
+# 数据处理
+numpy>=1.24.0             # 数值计算
+
+# 日志和配置
+python-dotenv>=1.0.0      # 环境变量管理
+
+# 可选依赖
+# tqdm>=4.65.0            # 进度条
+# matplotlib>=3.7.0       # 数据可视化

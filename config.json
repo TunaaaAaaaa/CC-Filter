@@ -1,0 +1,13 @@
+{
+  "min_text_length": 100,
+  "min_word_length": 3,
+  "max_word_length": 20,
+  "symbol_ratio_threshold": 0.1,
+  "num_perm": 128,
+  "dedup_threshold": 0.8,
+  "batch_size": 1000,
+  "target_languages": [
+    "en"
+  ],
+  "perplexity_threshold": -6.0
+}
