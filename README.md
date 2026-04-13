@@ -6,6 +6,13 @@
 
 将杂乱无章的原始网页数据（Common Crawl）转化为低噪、去重、高质量的纯文本数据，使其达到可以直接输入大语言模型进行预训练的标准。
 
+## 🔄 支持的数据格式
+
+项目支持两种输入数据格式：
+
+1. **WARC 格式** - 原始 Common Crawl 网页数据
+2. **C4 JSON 格式** - 从 HuggingFace 下载的预处理 C4 数据集
+
 ## 🏗️ 技术架构
 
 ### 核心技术栈
@@ -19,8 +26,14 @@
 
 ### 数据流水线
 
+**WARC 格式处理流程：**
 ```
 Raw WARC → Text Extraction → Heuristic Filtering → MinHash Deduplication → LangID & PPL Filtering → Final Dataset
+```
+
+**C4 JSON 格式处理流程：**
+```
+C4 JSON → Data Preprocessing → Heuristic Filtering → MinHash Deduplication → LangID & PPL Filtering → Final Dataset
 ```
 
 ## 📦 安装
@@ -60,11 +73,39 @@ python 6_quality_filter.py  # 会显示生成模型的命令
 
 ### 快速开始
 
+#### 处理 C4 JSON 数据（推荐）
+
+```bash
+# 1. 从 HuggingFace 下载 C4 数据集到 data/raw/ 目录
+# 2. 运行 C4 处理流水线
+python main_c4.py --input "data/raw/c4-train.*.json" --output data/final/c4_final_data.jsonl
+```
+
+#### 处理 WARC 格式数据
+
 ```bash
 python main.py --input data/raw/sample.warc.gz --output data/final/final_data.jsonl
 ```
 
 ### 完整参数
+
+#### C4 数据处理
+
+```bash
+python main_c4.py --input <c4_json_pattern> \
+                  --output <output_file> \
+                  --min-text-length 100 \
+                  --min-word-length 3 \
+                  --max-word-length 20 \
+                  --symbol-ratio-threshold 0.1 \
+                  --num-perm 128 \
+                  --dedup-threshold 0.8 \
+                  --batch-size 1000 \
+                  --target-languages en \
+                  --perplexity-threshold -6.0
+```
+
+#### WARC 数据处理
 
 ```bash
 python main.py --input <warc_file> \
@@ -94,12 +135,33 @@ python main.py --input <warc_file> \
 
 运行：
 ```bash
+# C4 数据处理
+python main_c4.py --input "data/raw/c4-train.*.json" --config config.json
+
+# WARC 数据处理
 python main.py --input data/raw/sample.warc.gz --config config.json
+```
+
+### C4 数据下载和处理示例
+
+```bash
+# 1. 从 HuggingFace 下载 C4 数据（使用 huggingface-cli 或直接下载）
+# 例如下载前3个训练文件：
+# wget https://huggingface.co/datasets/allenai/c4/resolve/main/en/c4-train.00000-of-01024.json
+# wget https://huggingface.co/datasets/allenai/c4/resolve/main/en/c4-train.00001-of-01024.json
+# wget https://huggingface.co/datasets/allenai/c4/resolve/main/en/c4-train.00002-of-01024.json
+
+# 2. 将下载的文件放到 data/raw/ 目录
+
+# 3. 运行 C4 处理流水线
+python main_c4.py --input "data/raw/c4-train.*.json" --output data/final/c4_final_data.jsonl
 ```
 
 ## 📊 处理效果
 
 ### 数据漏斗统计
+
+#### WARC 格式数据
 
 | 处理阶段 | 输入记录数 | 输出记录数 | 留存率 | 主要损耗原因 |
 |---------|-----------|-----------|--------|------------|
@@ -108,6 +170,16 @@ python main.py --input data/raw/sample.warc.gz --config config.json
 | 去重 (LSH) | 6,500 | ~4,800 | 73% | 转载文章、镜像站点 |
 | 语言/质量过滤 | 4,800 | ~3,900 | 81% | 非英文内容、高困惑度 |
 | **Total** | **35,000** | **3,900** | **~11%** | 最终产出率 |
+
+#### C4 JSON 格式数据
+
+| 处理阶段 | 输入记录数 | 输出记录数 | 留存率 | 主要损耗原因 |
+|---------|-----------|-----------|--------|------------|
+| C4 预处理 | ~1,068,952 | ~1,062,763 | 99.4% | 过短文本 |
+| 启发式清洗 | 1,062,763 | ~690,000 | 65% | 长度过短、符号密度过高 |
+| 去重 (LSH) | 690,000 | ~500,000 | 72% | 转载文章、镜像站点 |
+| 语言/质量过滤 | 500,000 | ~400,000 | 80% | 非英文内容、高困惑度 |
+| **Total** | **1,068,952** | **~400,000** | **~37%** | 最终产出率 |
 
 ### 过滤效果对比
 
@@ -124,6 +196,12 @@ python main.py --input data/raw/sample.warc.gz --config config.json
 > 触发: 符号密度 > 10%
 
 ## 🔧 模块说明
+
+### 0. C4 数据处理 (`1_process_c4.py`)
+- 处理从 HuggingFace 下载的 C4 JSON 格式数据
+- 支持批量处理多个文件
+- 过滤过短和空文本
+- 保留文本、URL和时间戳信息
 
 ### 1. WARC 处理 (`2_process_warc.py`)
 - 流式读取 WARC 压缩文件
@@ -201,7 +279,9 @@ python main.py --input data/raw/sample.warc.gz --config config.json
 
 ```
 CC-FIlter/
-├── main.py                  # 主入口
+├── main.py                  # WARC 数据主入口
+├── main_c4.py               # C4 数据主入口
+├── 1_process_c4.py          # C4 数据处理
 ├── 2_process_warc.py        # WARC 处理
 ├── 3_clean_data.py          # 数据清洗
 ├── 4_deduplicate.py         # 去重
@@ -211,6 +291,10 @@ CC-FIlter/
 ├── PLAN.md                  # 项目计划
 ├── README.md                # 项目说明
 ├── data/                    # 数据目录
+│   ├── raw/                 # 原始数据
+│   ├── processed/           # 处理后数据
+│   ├── split_by_language/   # 按语言分割
+│   └── final/               # 最终数据
 ├── models/                  # 模型目录
 └── logs/                    # 日志目录
 ```
